@@ -10,6 +10,7 @@ import (
 func (s *FiberServer) RegisterRoutes() {
 	var (
 		userH = handlers.NewUserHandler(s.storage)
+		expH  = handlers.NewExpenseHandler(s.storage)
 	)
 
 	s.Post("/users/register", userH.HandleRegisterUser)
@@ -24,4 +25,9 @@ func (s *FiberServer) RegisterRoutes() {
 	s.Get("/users", userH.HandleGetUserProfile)
 	s.Put("/users", userH.HandleUpdateUser)
 	s.Delete("/users", userH.HandleDeleteUser)
+
+	s.Post("/expenses", expH.HandleCreateExpense)
+	s.Get("/expenses", expH.HandleGetAllExpenses)
+	s.Put("/expenses/:id<int>", expH.HandleUpdateExpense)
+	s.Delete("/expenses/:id<int>", expH.HandleDeleteExpense)
 }

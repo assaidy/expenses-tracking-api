@@ -135,7 +135,7 @@ func (pg *PgStorage) DeleteUserById(id int) error {
 
 // category ===========================================================================
 func (pg *PgStorage) CheckIfCategoryExists(category string) (bool, error) {
-	query := `SELECT 1 FROM categories IF name = $1 LIMIT 1;`
+	query := `SELECT 1 FROM categories WHERE name = initcap($1) LIMIT 1;`
 	if err := pg.db.QueryRow(query, category).Scan(new(int)); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return false, nil
@@ -150,47 +150,79 @@ func (pg *PgStorage) CreateExpnse(exp *models.Expense) (*models.Expense, error) 
 	query := `
     INSERT INTO expenses(user_id, amount, category, description, added_at)
     VALUES($1, $2, $3, $4, $5)
-    RETURNING id;
+    RETURNING *;
     `
-	if err := pg.db.QueryRow(query,
-		exp.UserId, exp.Amount, exp.Category, exp.Description, exp.AddedAt).Scan(&exp.Id); err != nil {
+	if err := pg.db.QueryRow(query, exp.UserId, exp.Amount, exp.Category, exp.Description, exp.AddedAt).Scan(
+		&exp.Id, &exp.UserId, &exp.Amount, &exp.Category, &exp.Description, &exp.AddedAt); err != nil {
 		return nil, err
 	}
 	return exp, nil
 }
 
-func (pg *PgStorage) GetAllExpensesByUserId(uid int) ([]*models.Expense, error) {
-	// TODO: filter by [past {week, month, 3 months}, start/end date]
-	// query := `
-	// SELECT
-	//     id,
-	//     amount,
-	//     category,
-	//     description,
-	//     added_at
-	// FROM expenses
-	// WHERE user_id = $1
-	// LIMIT $2
-	// OFFSET $3
-	// ORDER BY added_at DESC;
-	// `
-	return nil, nil
+func (pg *PgStorage) GetAllExpensesByUserId(uid, page, limit int, sd, ed string) ([]*models.Expense, error) {
+	query := `
+	SELECT
+	    id,
+	    amount,
+	    category,
+	    description,
+	    added_at
+	FROM expenses
+	WHERE user_id = $1
+    `
+	if sd != "" && ed != "" {
+		query += `AND added_at BETWEEN $4 AND $5`
+	}
+	query += `
+	ORDER BY added_at DESC
+	LIMIT $2
+	OFFSET $3;
+	`
+	offset := (page - 1) * limit
+
+	var rows *sql.Rows
+	var err error
+	if sd != "" && ed != "" {
+		rows, err = pg.db.Query(query, uid, limit, offset, sd, ed)
+	} else {
+		rows, err = pg.db.Query(query, uid, limit, offset)
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	exps := make([]*models.Expense, 0)
+	for rows.Next() {
+		exp := models.Expense{UserId: uid}
+		if err := rows.Scan(
+			&exp.Id, &exp.Amount, &exp.Category, &exp.Description, &exp.AddedAt); err != nil {
+			return nil, err
+		}
+		exps = append(exps, &exp)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return exps, nil
 }
 
-func (pg *PgStorage) UpdateExpnse(exp *models.Expense) error {
+func (pg *PgStorage) UpdateExpnse(exp *models.Expense) (*models.Expense, error) {
 	query := `
     UPDATE expenses
     SET 
         amount = $1,
         category = $2,
         description = $3
-    WHERE id = $4;
+    WHERE id = $4
+    RETURNING *;
     `
-	if _, err := pg.db.Exec(query,
-		exp.Amount, exp.Category, exp.Description, exp.Id); err != nil {
-		return err
+	if err := pg.db.QueryRow(query, exp.Amount, exp.Category, exp.Description, exp.Id).Scan(
+		&exp.Id, &exp.UserId, &exp.Amount, &exp.Category, &exp.Description, &exp.AddedAt); err != nil {
+		return nil, err
 	}
-	return nil
+	return exp, nil
 }
 
 func (pg *PgStorage) DeleteExpenseById(id int) error {
@@ -201,9 +233,9 @@ func (pg *PgStorage) DeleteExpenseById(id int) error {
 	return nil
 }
 
-func (pg *PgStorage) CheckIfExpenseExists(id int) (bool, error) {
-	query := `SELECT 1 FROM expenses WHERE id = $1 LIMIT 1;`
-	if err := pg.db.QueryRow(query, id).Scan(new(int)); err != nil {
+func (pg *PgStorage) CheckIfExpenseExists(eid, uid int) (bool, error) {
+	query := `SELECT 1 FROM expenses WHERE id = $1 AND user_id = $2 LIMIT 1;`
+	if err := pg.db.QueryRow(query, eid, uid).Scan(new(int)); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return false, nil
 		}

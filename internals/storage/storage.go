@@ -19,8 +19,8 @@ type Storage interface {
 
 	// expenses pos
 	CreateExpnse(exp *models.Expense) (*models.Expense, error)
-	GetAllExpensesByUserId(uid int) ([]*models.Expense, error)
-	UpdateExpnse(exp *models.Expense) error
+	GetAllExpensesByUserId(uid, page, limit int, sd, ed string) ([]*models.Expense, error)
+	UpdateExpnse(exp *models.Expense) (*models.Expense, error)
 	DeleteExpenseById(id int) error
-	CheckIfExpenseExists(id int) (bool, error)
+	CheckIfExpenseExists(eid, uid int) (bool, error)
 }
