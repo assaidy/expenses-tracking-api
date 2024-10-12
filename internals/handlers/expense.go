@@ -148,7 +148,6 @@ func (h *ExpenseHandler) HandleUpdateExpense(c *fiber.Ctx) error {
 		return utils.NotFoundError(fmt.Sprintf("category %s not found", req.Category))
 	}
 
-	// TODO: add last_updated attribute
 	eid, _ := c.ParamsInt("id")
 	if ok, err := h.st.CheckIfExpenseExists(eid, uid); err != nil {
 		return utils.InternalServerError(err)

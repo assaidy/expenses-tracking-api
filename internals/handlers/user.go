@@ -36,10 +36,14 @@ func (h *UserHandler) HandleRegisterUser(c *fiber.Ctx) error {
 		return utils.ConflictError("username or email already exists")
 	}
 
+	hashedPassword, err := utils.HashPassword(req.Password)
+	if err != nil {
+		return utils.InternalServerError(err)
+	}
 	user := models.User{
 		Name:     req.Name,
 		Username: req.Username,
-		Password: req.Password, // TODO: hash the password
+		Password: hashedPassword,
 		Email:    req.Email,
 		JoinedAt: time.Now().UTC(),
 	}
@@ -66,7 +70,7 @@ func (h *UserHandler) HandleLoginUser(c *fiber.Ctx) error {
 	if err != nil {
 		return utils.InternalServerError(err)
 	}
-	if user == nil || req.Password != user.Password { // TODO: unhash the password
+	if user == nil || !utils.VerifyPasswrod(req.Password, user.Password) {
 		return utils.UnauthorizedError()
 	}
 

@@ -17,7 +17,6 @@ type FiberServer struct {
 }
 
 func NewFiberServer() *FiberServer {
-	// TODO: use a rate limiter
 	fs := &FiberServer{
 		App: fiber.New(fiber.Config{
 			ServerHeader: "expenses-tracking-api",
